@@ -67,7 +67,8 @@ class DMFBLayer(nn.Module, ABC):
 
 
 class Decoder(nn.Module, ABC):
-    def __init__(self, facial_fea_names, in_nc=512, out_nc=3, add_noise=True, latent_vector_size=512, region_normalized=True,
+    def __init__(self, facial_fea_names, in_nc=512, out_nc=3, add_noise=True, latent_vector_size=512,
+                 region_normalized=True,
                  is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
         super(Decoder, self).__init__()
 
@@ -268,12 +269,12 @@ class SPADEResnetBlock(nn.Module, ABC):
                 self.region_norm_s = RegionNorm(x_nc=in_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
                                                 latent_vector_size=latent_vector_size, norm_layer=norm_layer)
         else:
-            self.attr_mask_norm_0 = AttrMaskNorm(x_nc=in_nc, facial_fea_names=facial_fea_names,
+            self.attr_mask_norm_0 = AttrMaskNorm(x_nc=in_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
                                                  latent_vector_size=latent_vector_size, norm_layer=norm_layer)
-            self.attr_mask_norm_1 = AttrMaskNorm(x_nc=middle_nc, facial_fea_names=facial_fea_names,
+            self.attr_mask_norm_1 = AttrMaskNorm(x_nc=middle_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
                                                  latent_vector_size=latent_vector_size, norm_layer=norm_layer)
             if self.learned_skip:
-                self.attr_mask_norm_s = AttrMaskNorm(x_nc=in_nc, facial_fea_names=facial_fea_names,
+                self.attr_mask_norm_s = AttrMaskNorm(x_nc=in_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
                                                      latent_vector_size=latent_vector_size, norm_layer=norm_layer)
 
         self.act_f = nn.LeakyReLU(2e-1, True)
@@ -405,10 +406,11 @@ class SPADE(nn.Module, ABC):
 
 
 class AttrMaskNorm(nn.Module, ABC):
-    def __init__(self, x_nc, facial_fea_names, latent_vector_size=512, norm_layer=nn.InstanceNorm2d):
+    def __init__(self, x_nc, facial_fea_names, add_noise=True, latent_vector_size=512, norm_layer=nn.InstanceNorm2d):
         super(AttrMaskNorm, self).__init__()
         self.noise_var = nn.Parameter(torch.zeros(x_nc), requires_grad=True)
         self.norm_layer = norm_layer(x_nc)
+        self.add_noise = add_noise
 
         self.latent_vector_size = latent_vector_size
         self.facial_fea_names = facial_fea_names
@@ -433,9 +435,12 @@ class AttrMaskNorm(nn.Module, ABC):
 
     def forward(self, x, segmap, codes_vector, mask):
         # Part 1. generate parameter-free normalized activations
-        added_noise = (torch.randn(x.shape[0], x.shape[3], x.shape[2], 1, dtype=x.dtype, device=x.device)
-                       * self.noise_var).transpose(1, 3)
-        x_normalized = self.norm_layer(x + added_noise)
+        if self.add_noise:
+            added_noise = (torch.randn(x.shape[0], x.shape[3], x.shape[2], 1, dtype=x.dtype, device=x.device)
+                           * self.noise_var).transpose(1, 3)
+            x_normalized = self.norm_layer(x + added_noise)
+        else:
+            x_normalized = self.norm_layer(x)
 
         # Part 2. produce scaling and bias conditioned on semantic map
         segmap = F.interpolate(segmap, size=x.size()[2:], mode='nearest')

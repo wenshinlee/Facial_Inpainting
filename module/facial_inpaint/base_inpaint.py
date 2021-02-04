@@ -89,7 +89,7 @@ class BaseNetwork(torch.nn.Module, ABC):
 
     @staticmethod
     def set_requires_grad(nets, requires_grad=False):
-        """Set requies_grad=False for all the networks to avoid unnecessary computations
+        """Set requires_grad=False for all the networks to avoid unnecessary computations
         Parameters:
             nets (network list)   -- a list of networks
             requires_grad (bool)  -- whether the networks require gradients or not
