@@ -1,0 +1,61 @@
+attr_path: CelebAMask-HQ-attribute-anno.txt
+
+facial_fea_type:
+  skin: False
+  hair: True
+  mouth: True
+  nose: True
+  brow: True
+  eye: True
+
+# 对于均为0的情况,可以增加other属性
+skin:
+  # 年轻人
+  Young: True
+  # 微笑
+  Smiling: True
+  # 苍白皮肤
+  Pale_Skin: True
+  # 男性
+  Male: True
+
+hair:
+  # 灰发或白发 1242
+  Gray_Hair: True
+  # 黑发 6592
+  Black_Hair: True
+  # 金发 5126
+  Blond_Hair: True
+  # 棕发 6925
+  Brown_Hair: True
+  # 发型
+  # 卷发 10723
+  Wavy_Hair: True
+  # 直发 6444
+  Straight_Hair: True
+  # 刘海 5425
+  Bangs: True
+
+mouth:
+  # 微微张开嘴巴
+  Mouth_Slightly_Open: True
+  # 涂了唇膏
+  Wearing_Lipstick: True
+
+nose:
+  # 尖鼻子
+  Pointy_Nose: True
+  # 大鼻子
+  Big_Nose: True
+
+brow:
+  # 柳叶眉
+  Arched_Eyebrows: True
+  # 浓眉
+  Bushy_Eyebrows: True
+
+eye:
+  # 眼袋
+  Bags_Under_Eyes: True
+  # 细长的眼睛
+  Narrow_Eyes: True
