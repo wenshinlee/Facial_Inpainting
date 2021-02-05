@@ -80,13 +80,13 @@ def print_network(net):
     print('Total number of parameters: %d' % num_params)
 
 
-def define_G_DMFB(facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise=False,
+def define_G_DMFB(facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise=False, spade_segmap=True,
                   latent_vector_size=512, region_encoder=True, is_spectral_norm=True, gpu_ids=None,
                   norm_type='instance', init_type='normal', init_gain=0.02):
     if gpu_ids is None:
         gpu_ids = []
     norm_layer = get_norm_layer(norm_type=norm_type)
-    net = Generator(facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise,
+    net = Generator(facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise, spade_segmap,
                     latent_vector_size, region_encoder, is_spectral_norm, norm_layer=norm_layer)
     return init_net(net, init_type, init_gain, gpu_ids)
 

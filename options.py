@@ -12,7 +12,7 @@ class BaseOption(object):
 
     def initialize(self, parser):
         # base define
-        parser.add_argument('--model', type=str, default='region_model', help='name of the model type.')
+        parser.add_argument('--model', type=str, default='new_attr_model', help='name of the model type.')
         parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints',
                             help='models are saved here and options')
         # facial yaml
@@ -30,7 +30,7 @@ class BaseOption(object):
         parser.add_argument('--mask_dir', type=str,
                             default='/home/datasets/inpaint/celeba/Celeba-HQ-inpaint/mask',
                             help='dir to mask (celeba-HQ-mask)')
-        parser.add_argument('--p_irregular_miss', type=int, default=0,
+        parser.add_argument('--p_irregular_miss', type=int, default=0.5,
                             help='max miss number')
         parser.add_argument('--max_num_miss', type=int, default=4,
                             help='max miss number')
@@ -40,12 +40,14 @@ class BaseOption(object):
                             default='CelebA_Attr_CV2', help='which datasets, CelebA_HQ_Mask_CV2/CelebA_HQ_Mask_Skin')
         parser.add_argument('--dilate_iter', type=int, default=2,
                             help='dilate iter')
-        parser.add_argument('--batch_size', type=int, default=2, help='input batch size')
+        parser.add_argument('--batch_size', type=int, default=4, help='input batch size')
         parser.add_argument('--num_workers', type=int, default=4, help='numbers of the core of CPU')
 
         # generator
         parser.add_argument('--add_noise', action='store_false', default=True,
                             help='AttrMaskNorm input x add noise')
+        parser.add_argument('--spade_segmap', action='store_false', default=True,
+                            help='spade input segmap or mask')
         parser.add_argument('--latent_vector_size', type=int, default=512,
                             help='style/attr_encoder latent vector size')
         parser.add_argument('--region_encoder', action='store_true', default=False,

@@ -8,13 +8,13 @@ import functools
 
 
 class Generator(nn.Module, ABC):
-    def __init__(self, facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise=True,
+    def __init__(self, facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise=True, spade_segmap=True,
                  latent_vector_size=512, region_encoder=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
         super(Generator, self).__init__()
         self.region_encoder = region_encoder
         self.region_attr_encoder = RegionAttrEncoder(facial_fea_names, facial_fea_attr_names, facial_fea_attr_len,
                                                      region_encoder=region_encoder, norm_layer=norm_layer)
-        self.decoder = Decoder(facial_fea_names, in_nc=512, out_nc=3, add_noise=add_noise,
+        self.decoder = Decoder(facial_fea_names, in_nc=512, out_nc=3, add_noise=add_noise, spade_segmap=spade_segmap,
                                latent_vector_size=latent_vector_size, region_normalized=region_encoder,
                                is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
 
@@ -67,28 +67,27 @@ class DMFBLayer(nn.Module, ABC):
 
 
 class Decoder(nn.Module, ABC):
-    def __init__(self, facial_fea_names, in_nc=512, out_nc=3, add_noise=True, latent_vector_size=512,
-                 region_normalized=True,
-                 is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
+    def __init__(self, facial_fea_names, in_nc=512, out_nc=3, add_noise=True, spade_segmap=True,
+                 latent_vector_size=512, region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
         super(Decoder, self).__init__()
 
         # 4 SPADEResnetBlock
         # 0   1   2   3   4   conv
         # 512 256 128 64  32  ->   3
         # 16  32  64  128 256
-        self.spaderesnetblock_0 = SPADEResnetBlock(in_nc, in_nc, facial_fea_names, add_noise, latent_vector_size,
-                                                   region_normalized=region_normalized,
-                                                   is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
-        self.spaderesnetblock_1 = SPADEResnetBlock(in_nc, in_nc // 2, facial_fea_names, add_noise, latent_vector_size,
-                                                   region_normalized=region_normalized,
-                                                   is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
-        self.spaderesnetblock_2 = SPADEResnetBlock(in_nc // 2, in_nc // 4, facial_fea_names, add_noise,
+        self.spaderesnetblock_0 = SPADEResnetBlock(in_nc, in_nc, facial_fea_names, add_noise, spade_segmap,
                                                    latent_vector_size, region_normalized=region_normalized,
                                                    is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
-        self.spaderesnetblock_3 = SPADEResnetBlock(in_nc // 4, in_nc // 8, facial_fea_names, add_noise,
+        self.spaderesnetblock_1 = SPADEResnetBlock(in_nc, in_nc // 2, facial_fea_names, add_noise, spade_segmap,
                                                    latent_vector_size, region_normalized=region_normalized,
                                                    is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
-        self.spaderesnetblock_4 = SPADEResnetBlock(in_nc // 8, in_nc // 16, facial_fea_names, add_noise,
+        self.spaderesnetblock_2 = SPADEResnetBlock(in_nc // 2, in_nc // 4, facial_fea_names, add_noise, spade_segmap,
+                                                   latent_vector_size, region_normalized=region_normalized,
+                                                   is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
+        self.spaderesnetblock_3 = SPADEResnetBlock(in_nc // 4, in_nc // 8, facial_fea_names, add_noise, spade_segmap,
+                                                   latent_vector_size, region_normalized=region_normalized,
+                                                   is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
+        self.spaderesnetblock_4 = SPADEResnetBlock(in_nc // 8, in_nc // 16, facial_fea_names, add_noise, spade_segmap,
                                                    latent_vector_size, region_normalized=region_normalized,
                                                    is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
 
@@ -167,9 +166,12 @@ class RegionAttrEncoder(nn.Module, ABC):
     def init_attr_fea_extractor(self):
         for facial_fea_idx, facial_fea_name in enumerate(self.facial_fea_names):
             for facial_fea_attr_idx in range(self.facial_fea_attr_len[facial_fea_idx]):
-                facial_fea_attr_layer = [nn.AdaptiveAvgPool2d((self.output_nc, 1)),
+                setattr(self, facial_fea_name + '_pool2d_' + str(facial_fea_attr_idx),
+                        nn.AdaptiveAvgPool2d((self.output_nc, 2)))
+                facial_fea_attr_layer = [nn.Linear(self.output_nc * 2, self.output_nc),
                                          nn.LeakyReLU(0.2, False)]
-                setattr(self, facial_fea_name + '_' + str(facial_fea_attr_idx), nn.Sequential(*facial_fea_attr_layer))
+                setattr(self, facial_fea_name + '_linear_' + str(facial_fea_attr_idx),
+                        nn.Sequential(*facial_fea_attr_layer))
 
     def forward(self, x, segmap, attrs_matrix=None):
         """
@@ -226,11 +228,14 @@ class RegionAttrEncoder(nn.Module, ABC):
                         facial_seg_component_feature = torch.unsqueeze(facial_seg_component_feature, 0)
                         for facial_fea_attr_idx in range(self.facial_fea_attr_len[facial_fea_idx]):
                             if attrs_matrix[img_idx][facial_fea_idx][facial_fea_attr_idx] == 1:
-                                facial_fea_attr_model = getattr(self, self.facial_fea_names[facial_fea_idx] + '_' + str(
-                                    facial_fea_attr_idx))
-                                out = facial_fea_attr_model(facial_seg_component_feature)
-                                codes_vector[img_idx][facial_fea_idx][facial_fea_attr_idx + 1] = torch.squeeze(out,
-                                                                                                               0).t()
+                                attr_pool2d_model = getattr(self, self.facial_fea_names[facial_fea_idx] + '_pool2d_'
+                                                            + str(facial_fea_attr_idx))
+                                out_pool2d = attr_pool2d_model(facial_seg_component_feature)
+                                out_pool2d = out_pool2d.view(out_pool2d.size(0), -1)
+                                attr_linear_model = getattr(self, self.facial_fea_names[facial_fea_idx] + '_linear_'
+                                                            + str(facial_fea_attr_idx))
+                                out_linear = attr_linear_model(out_pool2d)
+                                codes_vector[img_idx][facial_fea_idx][facial_fea_attr_idx + 1] = out_linear
                     else:
                         # print('{}th segmap miss! '.format(facial_fea_idx))
                         pass
@@ -240,7 +245,7 @@ class RegionAttrEncoder(nn.Module, ABC):
 
 
 class SPADEResnetBlock(nn.Module, ABC):
-    def __init__(self, in_nc, out_nc, facial_fea_names, add_noise=True, latent_vector_size=512,
+    def __init__(self, in_nc, out_nc, facial_fea_names, add_noise=True, spade_segmap=True, latent_vector_size=512,
                  region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
         super(SPADEResnetBlock, self).__init__()
         self.region_normalized = region_normalized
@@ -262,20 +267,26 @@ class SPADEResnetBlock(nn.Module, ABC):
 
         if region_normalized:
             self.region_norm_0 = RegionNorm(x_nc=in_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
-                                            latent_vector_size=latent_vector_size, norm_layer=norm_layer)
+                                            spade_segmap=spade_segmap, latent_vector_size=latent_vector_size,
+                                            norm_layer=norm_layer)
             self.region_norm_1 = RegionNorm(x_nc=middle_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
-                                            latent_vector_size=latent_vector_size, norm_layer=norm_layer)
+                                            spade_segmap=spade_segmap, latent_vector_size=latent_vector_size,
+                                            norm_layer=norm_layer)
             if self.learned_skip:
                 self.region_norm_s = RegionNorm(x_nc=in_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
-                                                latent_vector_size=latent_vector_size, norm_layer=norm_layer)
+                                                spade_segmap=spade_segmap, latent_vector_size=latent_vector_size,
+                                                norm_layer=norm_layer)
         else:
             self.attr_mask_norm_0 = AttrMaskNorm(x_nc=in_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
-                                                 latent_vector_size=latent_vector_size, norm_layer=norm_layer)
+                                                 spade_segmap=spade_segmap, latent_vector_size=latent_vector_size,
+                                                 norm_layer=norm_layer)
             self.attr_mask_norm_1 = AttrMaskNorm(x_nc=middle_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
-                                                 latent_vector_size=latent_vector_size, norm_layer=norm_layer)
+                                                 spade_segmap=spade_segmap, latent_vector_size=latent_vector_size,
+                                                 norm_layer=norm_layer)
             if self.learned_skip:
                 self.attr_mask_norm_s = AttrMaskNorm(x_nc=in_nc, facial_fea_names=facial_fea_names, add_noise=add_noise,
-                                                     latent_vector_size=latent_vector_size, norm_layer=norm_layer)
+                                                     spade_segmap=spade_segmap, latent_vector_size=latent_vector_size,
+                                                     norm_layer=norm_layer)
 
         self.act_f = nn.LeakyReLU(2e-1, True)
 
@@ -319,13 +330,15 @@ class SPADEResnetBlock(nn.Module, ABC):
 
 
 class RegionNorm(nn.Module, ABC):
-    def __init__(self, x_nc, facial_fea_names, add_noise=True, latent_vector_size=512, norm_layer=nn.InstanceNorm2d):
+    def __init__(self, x_nc, facial_fea_names, add_noise=True, spade_segmap=True, latent_vector_size=512,
+                 norm_layer=nn.InstanceNorm2d):
         super(RegionNorm, self).__init__()
         self.norm_layer = norm_layer(x_nc)
         self.latent_vector_size = latent_vector_size
         self.noise_var = nn.Parameter(torch.zeros(x_nc), requires_grad=True)
         self.facial_fea_names = facial_fea_names
         self.add_noise = add_noise
+        self.spade_segmap = spade_segmap
 
         for facial_fea_name in facial_fea_names:
             setattr(self, facial_fea_name + '_fc', nn.Linear(latent_vector_size, latent_vector_size))
@@ -333,8 +346,10 @@ class RegionNorm(nn.Module, ABC):
         self.conv_gamma = nn.Conv2d(latent_vector_size, x_nc, kernel_size=3, padding=1)
         self.conv_beta = nn.Conv2d(latent_vector_size, x_nc, kernel_size=3, padding=1)
 
-        # self.spade = SPADE(x_nc, label_nc=len(facial_fea_names))
-        self.spade = SPADE(x_nc, label_nc=3)
+        if spade_segmap:
+            self.spade = SPADE(x_nc, label_nc=len(facial_fea_names))
+        else:
+            self.spade = SPADE(x_nc, label_nc=3)
 
         self.blending_gamma = nn.Parameter(torch.zeros(1), requires_grad=True)
         self.blending_beta = nn.Parameter(torch.zeros(1), requires_grad=True)
@@ -372,8 +387,10 @@ class RegionNorm(nn.Module, ABC):
         gamma_avg = self.conv_gamma(middle_avg)
         beta_avg = self.conv_beta(middle_avg)
 
-        # gamma_spade, beta_spade = self.spade(segmap)
-        gamma_spade, beta_spade = self.spade(mask)
+        if self.spade_segmap:
+            gamma_spade, beta_spade = self.spade(segmap)
+        else:
+            gamma_spade, beta_spade = self.spade(mask)
 
         gamma_alpha = torch.sigmoid(self.blending_gamma)
         beta_alpha = torch.sigmoid(self.blending_beta)
@@ -406,26 +423,22 @@ class SPADE(nn.Module, ABC):
 
 
 class AttrMaskNorm(nn.Module, ABC):
-    def __init__(self, x_nc, facial_fea_names, add_noise=True, latent_vector_size=512, norm_layer=nn.InstanceNorm2d):
+    def __init__(self, x_nc, facial_fea_names, add_noise=True, spade_segmap=True, latent_vector_size=512,
+                 norm_layer=nn.InstanceNorm2d):
         super(AttrMaskNorm, self).__init__()
         self.noise_var = nn.Parameter(torch.zeros(x_nc), requires_grad=True)
         self.norm_layer = norm_layer(x_nc)
         self.add_noise = add_noise
+        self.spade_segmap = spade_segmap
 
         self.latent_vector_size = latent_vector_size
         self.facial_fea_names = facial_fea_names
         self.num_facial_fea = len(self.facial_fea_names)
 
-        for facial_fea_name in facial_fea_names:
-            facial_fea_attr_layers = [
-                nn.Conv2d(1, 1, (1, 3), stride=1, padding=1, bias=False),
-                norm_layer(1),
-                nn.LeakyReLU(0.2, False)
-            ]
-            facial_fea_model = nn.Sequential(*facial_fea_attr_layers)
-            setattr(self, facial_fea_name + '_channel_model', facial_fea_model)
-
-        self.spade = SPADE(x_nc, label_nc=3)
+        if spade_segmap:
+            self.spade = SPADE(x_nc, label_nc=self.num_facial_fea)
+        else:
+            self.spade = SPADE(x_nc, label_nc=3)
 
         self.conv_gamma = nn.Conv2d(latent_vector_size, x_nc, kernel_size=3, padding=1)
         self.conv_beta = nn.Conv2d(latent_vector_size, x_nc, kernel_size=3, padding=1)
@@ -462,10 +475,9 @@ class AttrMaskNorm(nn.Module, ABC):
         attrs_matrix = codes_vector[:, :, 1:codes_vector.shape[2], :]
 
         for facial_fea_idx, facial_fea_name in enumerate(self.facial_fea_names):
-            facial_fea_attr_value = attrs_matrix[:, facial_fea_idx:facial_fea_idx + 1, :, :]
-            attr_conv_out = getattr(self, facial_fea_name + '_channel_model')(facial_fea_attr_value)
             middle_area_matrix[:, facial_fea_idx:facial_fea_idx + 1, :, :] = \
-                area_matrix[:, facial_fea_idx:facial_fea_idx + 1, :, :] + attr_conv_out.mean(dim=2, keepdim=True)
+                area_matrix[:, facial_fea_idx:facial_fea_idx + 1, :, :] + \
+                attrs_matrix[:, facial_fea_idx:facial_fea_idx + 1, :, :].mean(dim=2, keepdim=True)
 
         middle_style_matrix = torch.zeros((b_size, self.latent_vector_size, h_size, w_size), device=x.device)
 
@@ -482,8 +494,10 @@ class AttrMaskNorm(nn.Module, ABC):
         gamma_style = self.conv_gamma(middle_style_matrix)
         beta_style = self.conv_beta(middle_style_matrix)
 
-        gamma_spade, beta_spade = self.spade(mask)
-        # gamma_spade, beta_spade = self.spade(segmap)
+        if self.spade_segmap:
+            gamma_spade, beta_spade = self.spade(segmap)
+        else:
+            gamma_spade, beta_spade = self.spade(mask)
 
         gamma_alpha = torch.sigmoid(self.blending_gamma)
         beta_alpha = torch.sigmoid(self.blending_beta)

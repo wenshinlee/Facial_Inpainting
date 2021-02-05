@@ -19,8 +19,8 @@ class FacialInpaint(BaseNetwork, ABC):
         self.region_encoder = opt.region_encoder
 
         self.G = networks.define_G_DMFB(facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, opt.add_noise,
-                                        opt.latent_vector_size, opt.region_encoder, opt.is_spectral_norm,
-                                        opt.gpu_ids, opt.norm_type, opt.init_type, opt.init_gain)
+                                        opt.spade_segmap, opt.latent_vector_size, opt.region_encoder,
+                                        opt.is_spectral_norm, opt.gpu_ids, opt.norm_type, opt.init_type, opt.init_gain)
         self.model_names.append('G')
 
         if self.is_train:
