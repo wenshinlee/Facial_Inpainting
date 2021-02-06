@@ -9,7 +9,7 @@ import functools
 
 class Generator(nn.Module, ABC):
     def __init__(self, facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise=True, spade_segmap=True,
-                 latent_vector_size=512, skip_type='original', region_encoder=True, is_spectral_norm=True,
+                 latent_vector_size=512, skip_type='res', region_encoder=True, is_spectral_norm=True,
                  norm_layer=nn.InstanceNorm2d):
         super(Generator, self).__init__()
         self.region_encoder = region_encoder
@@ -70,7 +70,7 @@ class DMFBLayer(nn.Module, ABC):
 
 class Decoder(nn.Module, ABC):
     def __init__(self, facial_fea_names, in_nc=512, out_nc=3, add_noise=True, spade_segmap=True, latent_vector_size=512,
-                 skip_type='original', region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
+                 skip_type='res', region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
         super(Decoder, self).__init__()
 
         # 4 SPADEResnetBlock
@@ -253,7 +253,7 @@ class RegionAttrEncoder(nn.Module, ABC):
 
 class SPADEResnetBlock(nn.Module, ABC):
     def __init__(self, in_nc, out_nc, facial_fea_names, add_noise=True, spade_segmap=True, latent_vector_size=512,
-                 skip_type='original', region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
+                 skip_type='res', region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
         super(SPADEResnetBlock, self).__init__()
         self.region_normalized = region_normalized
 
@@ -325,9 +325,12 @@ class SPADEResnetBlock(nn.Module, ABC):
         return out
 
     def skip_layer(self, x, segmap, codes_vector, mask):
-        if self.skip_type == 'original':
-            x_s = x
-        elif self.skip_type == 'learned':
+        if self.skip_type == 'res':
+            if self.learned_skip:
+                x_s = self.conv_s(x)
+            else:
+                x_s = x
+        elif self.skip_type == 'norm':
             if self.learned_skip and self.region_normalized:
                 x_s = self.region_norm_s(x, segmap, codes_vector, mask)
                 x_s = self.conv_s(x_s)

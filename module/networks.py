@@ -81,7 +81,7 @@ def print_network(net):
 
 
 def define_G_DMFB(facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise=False, spade_segmap=True,
-                  latent_vector_size=512, skip_type='original', region_encoder=True, is_spectral_norm=True, gpu_ids=None,
+                  latent_vector_size=512, skip_type='res', region_encoder=True, is_spectral_norm=True, gpu_ids=None,
                   norm_type='instance', init_type='normal', init_gain=0.02):
     if gpu_ids is None:
         gpu_ids = []
