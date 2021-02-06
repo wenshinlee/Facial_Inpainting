@@ -48,6 +48,9 @@ class BaseOption(object):
                             help='AttrMaskNorm input x add noise')
         parser.add_argument('--spade_segmap', action='store_false', default=True,
                             help='spade input segmap or mask')
+        parser.add_argument('--skip_type', type=str, default='learned',
+                            help='The original residual network method is forced to be used for jump connection,'
+                                 'can be learned or original')
         parser.add_argument('--latent_vector_size', type=int, default=512,
                             help='style/attr_encoder latent vector size')
         parser.add_argument('--region_encoder', action='store_true', default=False,

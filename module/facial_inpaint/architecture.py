@@ -9,14 +9,16 @@ import functools
 
 class Generator(nn.Module, ABC):
     def __init__(self, facial_fea_names, facial_fea_attr_names, facial_fea_attr_len, add_noise=True, spade_segmap=True,
-                 latent_vector_size=512, region_encoder=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
+                 latent_vector_size=512, skip_type='original', region_encoder=True, is_spectral_norm=True,
+                 norm_layer=nn.InstanceNorm2d):
         super(Generator, self).__init__()
         self.region_encoder = region_encoder
         self.region_attr_encoder = RegionAttrEncoder(facial_fea_names, facial_fea_attr_names, facial_fea_attr_len,
                                                      region_encoder=region_encoder, norm_layer=norm_layer)
         self.decoder = Decoder(facial_fea_names, in_nc=512, out_nc=3, add_noise=add_noise, spade_segmap=spade_segmap,
-                               latent_vector_size=latent_vector_size, region_normalized=region_encoder,
-                               is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
+                               latent_vector_size=latent_vector_size, skip_type=skip_type,
+                               region_normalized=region_encoder, is_spectral_norm=is_spectral_norm,
+                               norm_layer=norm_layer)
 
     def forward(self, x, segmap, mask, attrs_matrix):
         if self.region_encoder:
@@ -67,8 +69,8 @@ class DMFBLayer(nn.Module, ABC):
 
 
 class Decoder(nn.Module, ABC):
-    def __init__(self, facial_fea_names, in_nc=512, out_nc=3, add_noise=True, spade_segmap=True,
-                 latent_vector_size=512, region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
+    def __init__(self, facial_fea_names, in_nc=512, out_nc=3, add_noise=True, spade_segmap=True, latent_vector_size=512,
+                 skip_type='original', region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
         super(Decoder, self).__init__()
 
         # 4 SPADEResnetBlock
@@ -76,19 +78,24 @@ class Decoder(nn.Module, ABC):
         # 512 256 128 64  32  ->   3
         # 16  32  64  128 256
         self.spaderesnetblock_0 = SPADEResnetBlock(in_nc, in_nc, facial_fea_names, add_noise, spade_segmap,
-                                                   latent_vector_size, region_normalized=region_normalized,
+                                                   latent_vector_size, skip_type=skip_type,
+                                                   region_normalized=region_normalized,
                                                    is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
         self.spaderesnetblock_1 = SPADEResnetBlock(in_nc, in_nc // 2, facial_fea_names, add_noise, spade_segmap,
-                                                   latent_vector_size, region_normalized=region_normalized,
+                                                   latent_vector_size, skip_type=skip_type,
+                                                   region_normalized=region_normalized,
                                                    is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
         self.spaderesnetblock_2 = SPADEResnetBlock(in_nc // 2, in_nc // 4, facial_fea_names, add_noise, spade_segmap,
-                                                   latent_vector_size, region_normalized=region_normalized,
+                                                   latent_vector_size, skip_type=skip_type,
+                                                   region_normalized=region_normalized,
                                                    is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
         self.spaderesnetblock_3 = SPADEResnetBlock(in_nc // 4, in_nc // 8, facial_fea_names, add_noise, spade_segmap,
-                                                   latent_vector_size, region_normalized=region_normalized,
+                                                   latent_vector_size, skip_type=skip_type,
+                                                   region_normalized=region_normalized,
                                                    is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
         self.spaderesnetblock_4 = SPADEResnetBlock(in_nc // 8, in_nc // 16, facial_fea_names, add_noise, spade_segmap,
-                                                   latent_vector_size, region_normalized=region_normalized,
+                                                   latent_vector_size, skip_type=skip_type,
+                                                   region_normalized=region_normalized,
                                                    is_spectral_norm=is_spectral_norm, norm_layer=norm_layer)
 
         self.conv_img = nn.Conv2d(in_nc // 16, out_nc, 3, stride=1, padding=1)
@@ -246,10 +253,11 @@ class RegionAttrEncoder(nn.Module, ABC):
 
 class SPADEResnetBlock(nn.Module, ABC):
     def __init__(self, in_nc, out_nc, facial_fea_names, add_noise=True, spade_segmap=True, latent_vector_size=512,
-                 region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
+                 skip_type='original', region_normalized=True, is_spectral_norm=True, norm_layer=nn.InstanceNorm2d):
         super(SPADEResnetBlock, self).__init__()
         self.region_normalized = region_normalized
 
+        self.skip_type = skip_type
         self.learned_skip = (in_nc != out_nc)
         middle_nc = min(in_nc, out_nc)
 
@@ -317,15 +325,19 @@ class SPADEResnetBlock(nn.Module, ABC):
         return out
 
     def skip_layer(self, x, segmap, codes_vector, mask):
-        if self.learned_skip and self.region_normalized:
-            x_s = self.region_norm_s(x, segmap, codes_vector, mask)
-            x_s = self.conv_s(x_s)
-        elif self.learned_skip and not self.region_normalized:
-            x_s = self.attr_mask_norm_s(x, segmap, codes_vector, mask)
-            x_s = self.conv_s(x_s)
-        else:
+        if self.skip_type == 'original':
             x_s = x
-
+        elif self.skip_type == 'learned':
+            if self.learned_skip and self.region_normalized:
+                x_s = self.region_norm_s(x, segmap, codes_vector, mask)
+                x_s = self.conv_s(x_s)
+            elif self.learned_skip and not self.region_normalized:
+                x_s = self.attr_mask_norm_s(x, segmap, codes_vector, mask)
+                x_s = self.conv_s(x_s)
+            else:
+                x_s = x
+        else:
+            raise ValueError("skip_type '{}' not support!".format(self.skip_type))
         return x_s
 
 
