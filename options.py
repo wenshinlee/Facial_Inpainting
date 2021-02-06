@@ -29,7 +29,7 @@ class BaseOption(object):
                             help='dir to detail images (which are the groundtruth)')
         parser.add_argument('--mask_dir', type=str,
                             default='/home/datasets/inpaint/celeba/Celeba-HQ-inpaint/mask',
-                            help='dir to mask (celeba-HQ-mask)')
+                            help='dir to mask (CelebA-HQ-mask)')
         parser.add_argument('--p_irregular_miss', type=int, default=0.5,
                             help='max miss number')
         parser.add_argument('--max_num_miss', type=int, default=4,
@@ -40,7 +40,7 @@ class BaseOption(object):
                             default='CelebA_Attr_CV2', help='which datasets, CelebA_HQ_Mask_CV2/CelebA_HQ_Mask_Skin')
         parser.add_argument('--dilate_iter', type=int, default=2,
                             help='dilate iter')
-        parser.add_argument('--batch_size', type=int, default=4, help='input batch size')
+        parser.add_argument('--batch_size', type=int, default=2, help='input batch size')
         parser.add_argument('--num_workers', type=int, default=4, help='numbers of the core of CPU')
 
         # generator
