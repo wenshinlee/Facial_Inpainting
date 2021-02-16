@@ -12,7 +12,7 @@ class BaseOption(object):
 
     def initialize(self, parser):
         # base define
-        parser.add_argument('--model', type=str, default='new_attr_model', help='name of the model type.')
+        parser.add_argument('--model', type=str, default='attr_res_model', help='name of the model type.')
         parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints',
                             help='models are saved here and options')
         # facial yaml
@@ -48,7 +48,7 @@ class BaseOption(object):
                             help='AttrMaskNorm input x add noise')
         parser.add_argument('--spade_segmap', action='store_false', default=True,
                             help='spade input segmap or mask')
-        parser.add_argument('--skip_type', type=str, default='norm',
+        parser.add_argument('--skip_type', type=str, default='res',
                             help='The original residual network method is forced to be used for jump connection,'
                                  'can be norm or res')
         parser.add_argument('--latent_vector_size', type=int, default=512,
@@ -179,6 +179,12 @@ class TestOption(BaseOption):
 
     def initialize(self, parser):
         super(TestOption, self).initialize(parser)
+        parser.add_argument('--test_mask_dir', type=str, default='/home/datasets/inpaint/mask/'
+                                                                 'test_mask/testing_mask_ratios/ratios_1',
+                            help='test mask dir')
+        parser.add_argument('--test_dataset_name', type=str, default='CelebA_Attr_Test',
+                            help='which epoch to load? set to latest to use latest cached model')
+
         parser.add_argument('--which_epoch', type=str, default='',
                             help='which epoch to load? set to latest to use latest cached model')
         parser.add_argument('--results_fake_dir', type=str, default='./output/fake_img',

@@ -32,7 +32,7 @@ class CelebA_Dataset(data.Dataset):
         self.facial_fea_attr_names = facial_fea_attr_names
         self.facial_fea_attr_len = facial_fea_attr_len
         self.dataset = facial_attr_dataset
-        self.dataset = self.dataset[1999:] if self.is_train else self.dataset[:1999]
+        self.dataset = self.dataset[2000:] if self.is_train else self.dataset[:2000]
 
         assert self.max_num_miss <= self.num_facial_fea, "max_num_miss must <= num_facial_fea!"
 
@@ -150,6 +150,34 @@ class CelebA_Face_Cls(data.Dataset):
         return file_name, self.image_transform(image), torch.FloatTensor(attr)
 
 
+class CelebA_Attr_Test(CelebA_Dataset):
+    def __init__(self, image_dir, mask_dir, image_size, facial_fea_names, facial_fea_attr_names, facial_fea_attr_len,
+                 facial_attr_dataset, p_irregular_miss, max_num_miss, dilate_iter, is_train, image_transform,
+                 mask_transform):
+        super().__init__(image_dir, mask_dir, image_size, facial_fea_names, facial_fea_attr_names, facial_fea_attr_len,
+                         facial_attr_dataset, p_irregular_miss, max_num_miss, dilate_iter, is_train, image_transform,
+                         mask_transform)
+        self.mask_names = os.listdir(self.mask_dir)
+        assert len(self.mask_names) == len(self.dataset), 'mask length must equal dataset images length.'
+
+    def __getitem__(self, item):
+        file_name, attr_matrix = self.dataset[item]
+        image = self.load_image(file_name=file_name)
+
+        segmap = self.load_segmap(file_name)
+
+        mask_name = self.mask_names[item]
+        mask = self.load_test_mask(mask_name)
+
+        return file_name, self.image_transform(self.convert_pil(image)), self.mask_transform(self.convert_pil(mask)), \
+               torch.FloatTensor(segmap), torch.FloatTensor(attr_matrix)
+
+    def load_test_mask(self, file_name):
+        mask = cv2.imread(os.path.join(self.mask_dir, file_name))
+        mask = cv2.resize(mask, (self.image_size, self.image_size), interpolation=cv2.INTER_NEAREST)
+        return mask
+
+
 def generate_stroke_mask(mask_zeros, max_parts=9, maxVertex=25, maxLength=100, maxBrushWidth=24, maxAngle=360):
     parts = random.randint(1, max_parts)
     for i in range(parts):
@@ -204,8 +232,10 @@ def get_dataloader(image_dir, mask_dir, facial_fea_names, facial_fea_attr_names,
         dataset = CelebA_Attr_CV2(image_dir, mask_dir, image_size, facial_fea_names, facial_fea_attr_names,
                                   facial_fea_attr_len, facial_attr_dataset, p_irregular_miss, max_num_miss,
                                   dilate_iter, is_train, image_transform, mask_transform)
-    elif dataset_name == 'CelebA_Face_Cls':
-        dataset = None
+    elif dataset_name == 'CelebA_Attr_Test':
+        dataset = CelebA_Attr_Test(image_dir, mask_dir, image_size, facial_fea_names, facial_fea_attr_names,
+                                   facial_fea_attr_len, facial_attr_dataset, p_irregular_miss, max_num_miss,
+                                   dilate_iter, is_train, image_transform, mask_transform)
     else:
         dataset = None
 
