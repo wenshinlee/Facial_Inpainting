@@ -14,9 +14,9 @@ if __name__ == '__main__':
     facial_fea_attr_len = facial_yaml.get_facial_fea_attr_len()
     facial_attr_dataset = facial_yaml.get_facial_attr_dataset()
 
-    data_loader = get_dataloader(opt.image_dir, opt.test_mask_dir, facial_fea_names, facial_fea_attr_names,
-                                 facial_fea_attr_len, facial_attr_dataset, opt.p_irregular_miss, opt.max_num_miss,
-                                 opt.image_size, opt.test_dataset_name, opt.dilate_iter, opt.is_train,
+    data_loader = get_dataloader(opt.image_dir, opt.test_mask_dir, opt.base_mask, facial_fea_names,
+                                 facial_fea_attr_names, facial_fea_attr_len, facial_attr_dataset, opt.p_irregular_miss,
+                                 opt.max_num_miss, opt.image_size, opt.dataset_name, opt.dilate_iter, opt.is_train,
                                  opt.batch_size, opt.num_workers)
     model = FacialInpaint(opt, facial_fea_names, facial_fea_attr_names, facial_fea_attr_len)
 

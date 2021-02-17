@@ -27,9 +27,16 @@ class BaseOption(object):
         parser.add_argument('--image_dir', type=str,
                             default='/home/datasets/inpaint/celeba/Celeba-HQ-inpaint/images',
                             help='dir to detail images (which are the groundtruth)')
+        # if base mask is false
+        # parser.add_argument('--mask_dir', type=str,
+        #                     default='/home/datasets/inpaint/celeba/Celeba-HQ-inpaint/mask',
+        #                     help='dir to mask (CelebA-HQ-mask)')
+        # if base mask is True
         parser.add_argument('--mask_dir', type=str,
-                            default='/home/datasets/inpaint/celeba/Celeba-HQ-inpaint/mask',
-                            help='dir to mask (CelebA-HQ-mask)')
+                            default='/home/datasets/inpaint/mask/test_mask/testing_mask_dataset',
+                            help='dir to mask (Pconv-mask)')
+        parser.add_argument('--base_mask', action='store_true', default=False,
+                            help='base mask')
         parser.add_argument('--p_irregular_miss', type=int, default=0.5,
                             help='max miss number')
         parser.add_argument('--max_num_miss', type=int, default=4,
@@ -180,11 +187,8 @@ class TestOption(BaseOption):
     def initialize(self, parser):
         super(TestOption, self).initialize(parser)
         parser.add_argument('--test_mask_dir', type=str, default='/home/datasets/inpaint/mask/'
-                                                                 'test_mask/testing_mask_ratios/ratios_1',
+                                                                 'test_mask/testing_mask_ratios/ratios_2',
                             help='test mask dir')
-        parser.add_argument('--test_dataset_name', type=str, default='CelebA_Attr_Test',
-                            help='which epoch to load? set to latest to use latest cached model')
-
         parser.add_argument('--which_epoch', type=str, default='',
                             help='which epoch to load? set to latest to use latest cached model')
         parser.add_argument('--results_fake_dir', type=str, default='./output/fake_img',

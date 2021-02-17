@@ -254,9 +254,11 @@ class FacialInpaint(BaseNetwork, ABC):
             save_gt = gt[idx][..., ::-1].astype(np.uint8)
             save_output = output[idx][..., ::-1].astype(np.uint8)
             save_inputs = inputs[idx][..., ::-1].astype(np.uint8)
+            # save path
             fake_save_path = os.path.join(self.opt.results_fake_dir, self.file_name[idx])
             gt_save_path = os.path.join(self.opt.results_gt_dir, self.file_name[idx])
             inputs_save_path = os.path.join(self.opt.results_input_dir, self.file_name[idx])
+            # save
             cv2.imwrite(fake_save_path, save_output)
             cv2.imwrite(gt_save_path, save_gt)
             cv2.imwrite(inputs_save_path, save_inputs)
