@@ -249,18 +249,22 @@ class FacialInpaint(BaseNetwork, ABC):
         gt = real_gt.numpy().transpose((0, 2, 3, 1)) * 255
         output = fake_image.numpy().transpose((0, 2, 3, 1)) * 255
         inputs = input_image.numpy().transpose((0, 2, 3, 1)) * 255
+        mask = self.mask.cpu().numpy().transpose((0, 2, 3, 1)) * 255
         for idx in range(output.shape[0]):
             # rgb -> bgr
             save_gt = gt[idx][..., ::-1].astype(np.uint8)
             save_output = output[idx][..., ::-1].astype(np.uint8)
             save_inputs = inputs[idx][..., ::-1].astype(np.uint8)
+            mask_inputs = mask[idx][..., ::-1].astype(np.uint8)
             # save path
             fake_save_path = os.path.join(self.opt.results_fake_dir, self.file_name[idx])
             gt_save_path = os.path.join(self.opt.results_gt_dir, self.file_name[idx])
             inputs_save_path = os.path.join(self.opt.results_input_dir, self.file_name[idx])
+            mask_save_path = os.path.join(self.opt.results_mask_dir, self.file_name[idx])
             # save
             cv2.imwrite(fake_save_path, save_output)
             cv2.imwrite(gt_save_path, save_gt)
             cv2.imwrite(inputs_save_path, save_inputs)
+            cv2.imwrite(mask_save_path, mask_inputs)
 
 

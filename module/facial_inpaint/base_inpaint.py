@@ -14,6 +14,7 @@ class BaseNetwork(torch.nn.Module, ABC):
             utils.mkdirs(self.opt.results_fake_dir)
             utils.mkdirs(self.opt.results_gt_dir)
             utils.mkdirs(self.opt.results_input_dir)
+            utils.mkdirs(self.opt.results_mask_dir)
         # list
         self.model_names = []
         self.optimizers = []

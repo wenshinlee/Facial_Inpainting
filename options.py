@@ -12,7 +12,7 @@ class BaseOption(object):
 
     def initialize(self, parser):
         # base define
-        parser.add_argument('--model', type=str, default='attr_res_model', help='name of the model type.')
+        parser.add_argument('--model', type=str, default='region_mask_res_model', help='name of the model type.')
         parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints',
                             help='models are saved here and options')
         # facial yaml
@@ -33,9 +33,9 @@ class BaseOption(object):
         #                     help='dir to mask (CelebA-HQ-mask)')
         # if base mask is True
         parser.add_argument('--mask_dir', type=str,
-                            default='/home/datasets/inpaint/mask/test_mask/testing_mask_dataset',
+                            default='/home/datasets/inpaint/mask/test_mask/testing_mask_ratios/ratios_3',
                             help='dir to mask (Pconv-mask)')
-        parser.add_argument('--base_mask', action='store_true', default=False,
+        parser.add_argument('--base_mask', action='store_false', default=True,
                             help='base mask')
         parser.add_argument('--p_irregular_miss', type=int, default=0.5,
                             help='max miss number')
@@ -45,7 +45,7 @@ class BaseOption(object):
                             help='then crop and resize to this size')
         parser.add_argument('--dataset_name', type=str,
                             default='CelebA_Attr_CV2', help='which datasets, CelebA_HQ_Mask_CV2/CelebA_HQ_Mask_Skin')
-        parser.add_argument('--dilate_iter', type=int, default=2,
+        parser.add_argument('--dilate_iter', type=int, default=4,
                             help='dilate iter')
         parser.add_argument('--batch_size', type=int, default=2, help='input batch size')
         parser.add_argument('--num_workers', type=int, default=4, help='numbers of the core of CPU')
@@ -187,7 +187,7 @@ class TestOption(BaseOption):
     def initialize(self, parser):
         super(TestOption, self).initialize(parser)
         parser.add_argument('--test_mask_dir', type=str, default='/home/datasets/inpaint/mask/'
-                                                                 'test_mask/testing_mask_ratios/ratios_2',
+                                                                 'test_mask/testing_mask_ratios/ratios_1',
                             help='test mask dir')
         parser.add_argument('--which_epoch', type=str, default='',
                             help='which epoch to load? set to latest to use latest cached model')
@@ -196,6 +196,8 @@ class TestOption(BaseOption):
         parser.add_argument('--results_gt_dir', type=str, default='./output/gt_img',
                             help='')
         parser.add_argument('--results_input_dir', type=str, default='./output/input_img',
+                            help='')
+        parser.add_argument('--results_mask_dir', type=str, default='./output/mask_img',
                             help='')
         self.is_train = False
         return parser

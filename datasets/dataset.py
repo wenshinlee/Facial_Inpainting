@@ -186,6 +186,7 @@ class CelebA_Face_Cls(data.Dataset):
 
 
 def generate_stroke_mask(mask_zeros, max_parts=9, maxVertex=25, maxLength=100, maxBrushWidth=24, maxAngle=360):
+    np.random.seed(None)
     parts = random.randint(1, max_parts)
     for i in range(parts):
         mask_zeros = mask_zeros + np_free_form_mask(maxVertex, maxLength, maxBrushWidth, maxAngle,
