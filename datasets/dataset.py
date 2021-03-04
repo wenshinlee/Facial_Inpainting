@@ -12,17 +12,17 @@ from PIL import Image
 
 
 class CelebA_Dataset(data.Dataset):
-    def __init__(self, image_dir, mask_dir, image_size, base_mask,
+    def __init__(self, image_dir, segmap_mask_dir, image_size, pconv_mask_dir,
                  facial_fea_names, facial_fea_attr_names, facial_fea_attr_len,
-                 facial_attr_dataset, p_irregular_miss, max_num_miss, dilate_iter,
+                 facial_attr_dataset, p_generate_miss, max_num_miss, dilate_iter,
                  is_train, image_transform, mask_transform):
         super(CelebA_Dataset, self).__init__()
         self.image_dir = image_dir
-        self.mask_dir = mask_dir
+        self.segmap_mask_dir = segmap_mask_dir
         self.image_size = image_size
-        self.base_mask = base_mask
+        self.pconv_mask_dir = pconv_mask_dir
         self.max_num_miss = max_num_miss
-        self.p_irregular_miss = p_irregular_miss
+        self.p_generate_miss = p_generate_miss
         self.dilate_iter = dilate_iter
         self.is_train = is_train
         self.image_transform = image_transform
@@ -34,13 +34,9 @@ class CelebA_Dataset(data.Dataset):
         self.facial_fea_attr_len = facial_fea_attr_len
         self.dataset = facial_attr_dataset
         self.dataset = self.dataset[2000:] if self.is_train else self.dataset[:2000]
+        self.pconv_mask_names = sorted(os.listdir(self.pconv_mask_dir))
 
         assert self.max_num_miss <= self.num_facial_fea, "max_num_miss must <= num_facial_fea!"
-
-        if not self.is_train or self.base_mask:
-            self.mask_names = sorted(os.listdir(self.mask_dir))
-            if not self.is_train:
-                assert len(self.mask_names) == len(self.dataset), 'mask length must equal dataset images length.'
 
     def __len__(self):
         return len(self.dataset)
@@ -55,9 +51,10 @@ class CelebA_Dataset(data.Dataset):
 
     def load_mask(self, file_name, mask_zeros, item, miss_area_names=None):
         if self.is_train:
-            if self.base_mask:
-                np.random.seed(None)
-                mask_path = os.path.join(self.mask_dir, np.random.choice(self.mask_names))
+            np.random.seed(None)
+            which_mask_p = np.random.random()
+            if which_mask_p > 0.3:
+                mask_path = os.path.join(self.pconv_mask_dir, np.random.choice(self.pconv_mask_names))
                 if os.path.exists(mask_path):
                     mask = cv2.resize(cv2.imread(mask_path), (self.image_size, self.image_size),
                                       interpolation=cv2.INTER_NEAREST)
@@ -71,7 +68,7 @@ class CelebA_Dataset(data.Dataset):
                 if miss_area_names is not None and isinstance(miss_area_names, list):
                     # not None, just for specified facial fea miss
                     for miss_type in miss_area_names:
-                        mask_path = os.path.join(self.mask_dir, miss_type, file_name)
+                        mask_path = os.path.join(self.segmap_mask_dir, miss_type, file_name)
                         if os.path.exists(mask_path):
                             mask = cv2.resize(cv2.imread(mask_path), (self.image_size, self.image_size),
                                               interpolation=cv2.INTER_NEAREST)
@@ -84,7 +81,7 @@ class CelebA_Dataset(data.Dataset):
                     mask_zeros = generate_stroke_mask(mask_zeros)
                     mask_zeros = (mask_zeros > 0).astype(np.uint8) * 255
         else:
-            mask_path = os.path.join(self.mask_dir, self.mask_names[item])
+            mask_path = os.path.join(self.pconv_mask_dir, self.pconv_mask_names[item])
             if os.path.exists(mask_path):
                 mask = cv2.resize(cv2.imread(mask_path), (self.image_size, self.image_size),
                                   interpolation=cv2.INTER_NEAREST)
@@ -106,7 +103,7 @@ class CelebA_Dataset(data.Dataset):
     def load_segmap(self, file_name):
         segmap = np.zeros((self.num_facial_fea, self.image_size, self.image_size))
         for idx, facial_fea_name in enumerate(self.facial_fea_names):
-            segmap_path = os.path.join(self.mask_dir, facial_fea_name, file_name)
+            segmap_path = os.path.join(self.segmap_mask_dir, facial_fea_name, file_name)
             if os.path.exists(segmap_path):
                 facial_segmap = cv2.resize(cv2.imread(segmap_path, cv2.IMREAD_GRAYSCALE),
                                            (self.image_size, self.image_size), interpolation=cv2.INTER_NEAREST)
@@ -114,20 +111,20 @@ class CelebA_Dataset(data.Dataset):
         return segmap
 
     def get_miss_area_names(self, p=None):
-        # Equal probability missing
-        if not p:
-            p_factor = 1.0 / self.num_facial_fea
-            p = [p_factor for _ in range(self.num_facial_fea)]
-        else:
-            assert len(p) == self.num_facial_fea, "p length must equal num_facial_fea"
 
-        np.random.seed(None)
-        num_miss_area = np.random.randint(1, self.max_num_miss + 1)
-        miss_area_names = np.random.choice(self.facial_fea_names, num_miss_area, replace=False, p=p).tolist()
-
-        if self.p_irregular_miss > np.random.random(1):  # [0.0, 1.0)
+        if self.p_generate_miss > np.random.random(1):  # [0.0, 1.0)
             return None
         else:
+            # Equal probability missing
+            if not p:
+                p_factor = 1.0 / self.num_facial_fea
+                p = [p_factor for _ in range(self.num_facial_fea)]
+            else:
+                assert len(p) == self.num_facial_fea, "p length must equal num_facial_fea"
+
+            np.random.seed(None)
+            num_miss_area = np.random.randint(1, self.max_num_miss + 1)
+            miss_area_names = np.random.choice(self.facial_fea_names, num_miss_area, replace=False, p=p).tolist()
             return miss_area_names
 
     @staticmethod
@@ -141,12 +138,12 @@ class CelebA_Attr_CV2(CelebA_Dataset):
     根据语义分割图和随机生成Mask,随机的对图像进行缺失,不考虑属性的问题
     """
 
-    def __init__(self, image_dir, mask_dir, image_size, base_mask, facial_fea_names, facial_fea_attr_names,
-                 facial_fea_attr_len, facial_attr_dataset, p_irregular_miss, max_num_miss, dilate_iter,
+    def __init__(self, image_dir, segmap_mask_dir, image_size, pconv_mask_dir, facial_fea_names, facial_fea_attr_names,
+                 facial_fea_attr_len, facial_attr_dataset, p_generate_miss, max_num_miss, dilate_iter,
                  is_train, image_transform, mask_transform):
-        super(CelebA_Attr_CV2, self).__init__(image_dir, mask_dir, image_size, base_mask, facial_fea_names,
+        super(CelebA_Attr_CV2, self).__init__(image_dir, segmap_mask_dir, image_size, pconv_mask_dir, facial_fea_names,
                                               facial_fea_attr_names, facial_fea_attr_len, facial_attr_dataset,
-                                              p_irregular_miss, max_num_miss, dilate_iter, is_train,
+                                              p_generate_miss, max_num_miss, dilate_iter, is_train,
                                               image_transform, mask_transform)
 
     def __getitem__(self, item):
@@ -219,8 +216,8 @@ def np_free_form_mask(maxVertex, maxLength, maxBrushWidth, maxAngle, h, w):
     return mask
 
 
-def get_dataloader(image_dir, mask_dir, base_mask, facial_fea_names, facial_fea_attr_names,
-                   facial_fea_attr_len, facial_attr_dataset, p_irregular_miss, max_num_miss, image_size=256,
+def get_dataloader(image_dir, segmap_mask_dir, pconv_mask_dir, facial_fea_names, facial_fea_attr_names,
+                   facial_fea_attr_len, facial_attr_dataset, p_generate_miss, max_num_miss, image_size=256,
                    dataset_name='CelebA_Attr_CV2', dilate_iter=2, is_train=True,
                    batch_size=2, num_workers=4):
     """return a data loader"""
@@ -237,9 +234,10 @@ def get_dataloader(image_dir, mask_dir, base_mask, facial_fea_names, facial_fea_
     ])
 
     if dataset_name == 'CelebA_Attr_CV2':
-        dataset = CelebA_Attr_CV2(image_dir, mask_dir, image_size, base_mask, facial_fea_names, facial_fea_attr_names,
-                                  facial_fea_attr_len, facial_attr_dataset, p_irregular_miss, max_num_miss,
-                                  dilate_iter, is_train, image_transform, mask_transform)
+        dataset = CelebA_Attr_CV2(image_dir, segmap_mask_dir, image_size, pconv_mask_dir, facial_fea_names,
+                                  facial_fea_attr_names, facial_fea_attr_len, facial_attr_dataset,
+                                  p_generate_miss, max_num_miss, dilate_iter, is_train,
+                                  image_transform, mask_transform)
     else:
         dataset = None
 

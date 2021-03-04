@@ -27,18 +27,17 @@ class BaseOption(object):
         parser.add_argument('--image_dir', type=str,
                             default='/home/datasets/inpaint/celeba/Celeba-HQ-inpaint/images',
                             help='dir to detail images (which are the groundtruth)')
-        # if base mask is false
-        # parser.add_argument('--mask_dir', type=str,
-        #                     default='/home/datasets/inpaint/celeba/Celeba-HQ-inpaint/mask',
-        #                     help='dir to mask (CelebA-HQ-mask)')
-        # if base mask is True
-        parser.add_argument('--mask_dir', type=str,
-                            default='/home/datasets/inpaint/mask/test_mask/testing_mask_ratios/ratios_3',
+        # facial segmap mask
+        parser.add_argument('--segmap_mask_dir', type=str,
+                            default='/home/datasets/inpaint/celeba/Celeba-HQ-inpaint/mask',
+                            help='dir to mask (CelebA-HQ-mask)')
+        # Pconv-test mask
+        parser.add_argument('--pconv_mask_dir', type=str,
+                            default='/home/datasets/inpaint/mask/test_mask/testing_mask_ratios/ratios_1',
                             help='dir to mask (Pconv-mask)')
-        parser.add_argument('--base_mask', action='store_false', default=True,
-                            help='base mask')
-        parser.add_argument('--p_irregular_miss', type=int, default=0.5,
-                            help='max miss number')
+        # no random generate miss area
+        parser.add_argument('--p_generate_miss', type=int, default=0.0,
+                            help='random generate miss area')
         parser.add_argument('--max_num_miss', type=int, default=4,
                             help='max miss number')
         parser.add_argument('--image_size', type=int, default=256,
